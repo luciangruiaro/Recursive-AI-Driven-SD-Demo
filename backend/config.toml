@@ -1,0 +1,50 @@
+# ─── Server ───────────────────────────────────────────────────────────────────
+[server]
+host = "127.0.0.1"
+port = 8729          # uncommon to avoid conflicts with typical dev ports
+reload = true
+log_level = "info"
+
+# ─── CORS (origins allowed to call the backend) ───────────────────────────────
+[cors]
+allow_origins = [
+    "http://localhost:4329",
+    "http://127.0.0.1:4329",
+]
+
+# ─── LLM ──────────────────────────────────────────────────────────────────────
+[llm]
+provider = "openai"
+model = "gpt-4o-mini"
+temperature = 0.7
+max_tokens = 1024
+system_prompt = """\
+You are a thoughtful assistant for a software-engineering talk about recursive \
+AI-driven development and self-evolving systems. Answer concisely in clean, \
+well-structured Markdown. Use fenced code blocks for code, headings sparingly, \
+and prefer short, scannable paragraphs.\
+"""
+
+# ─── UI (returned verbatim to the frontend at /api/config) ────────────────────
+[ui]
+title = "Recursive AI-Driven Software Development"
+subtitle = "Architecting self-evolving systems."
+placeholder = "Ask anything…"
+
+[ui.theme]
+font_sans = "'Inter', 'SF Pro Display', system-ui, sans-serif"
+font_mono = "'JetBrains Mono', 'Fira Code', ui-monospace, monospace"
+
+[ui.theme.colors]
+background       = "#0a0a0f"
+surface          = "#12121a"
+surface_elevated = "#1a1a26"
+border           = "#26263a"
+text_primary     = "#f5f5fa"
+text_secondary   = "#9ca3af"
+text_muted       = "#6b7280"
+primary          = "#8b5cf6"
+primary_hover    = "#a78bfa"
+accent           = "#06b6d4"
+success          = "#10b981"
+error            = "#ef4444"

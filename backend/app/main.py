@@ -1,0 +1,50 @@
+"""FastAPI application factory.
+
+Wires configuration, CORS, the shared LLM client, and route modules together.
+Kept deliberately thin — composition lives here, behaviour lives in
+``app.routes`` and ``app.llm``.
+"""
+
+from __future__ import annotations
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app import __version__
+from app.config import get_settings
+from app.llm import create_llm_client
+from app.routes import chat, hello, ui_config
+
+
+def create_app() -> FastAPI:
+    settings = get_settings()
+
+    app = FastAPI(
+        title="Recursive AI-Driven SD — Backend",
+        version=__version__,
+        docs_url="/docs",
+        redoc_url=None,
+    )
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors.allow_origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST"],
+        allow_headers=["*"],
+    )
+
+    # Shared, app-scoped LLM client. Injected into routes via request.app.state.
+    app.state.llm_client = create_llm_client(
+        api_key=settings.secrets.openai_api_key.get_secret_value(),
+        config=settings.llm,
+    )
+
+    app.include_router(hello.router)
+    app.include_router(chat.router)
+    app.include_router(ui_config.router)
+
+    return app
+
+
+app = create_app()
