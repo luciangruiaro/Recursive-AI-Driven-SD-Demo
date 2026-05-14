@@ -199,6 +199,14 @@ class ClaudeCodeClient:
             )
         except FileNotFoundError as e:
             raise ClaudeCodeError(f"failed to start claude CLI: {e}") from e
+        except NotImplementedError as e:
+            # Hit when the current asyncio loop policy doesn't support
+            # subprocesses — typically Windows + WindowsSelectorEventLoopPolicy.
+            raise ClaudeCodeError(
+                "this asyncio event loop does not support subprocesses "
+                "(on Windows, launch the server with loop=\"none\" so "
+                "ProactorEventLoop is used — see app/__main__.py)",
+            ) from e
 
         logger.info("[dim]claude pid=%d[/dim]", proc.pid)
 
