@@ -1,0 +1,126 @@
+%% Recursive AI-Driven SD Demo — system architecture
+%%
+%% Three demo entry points (chat / coding agent / self-evolving) all flow
+%% through one input. The self-evolve path writes back into config.toml,
+%% which the watcher pushes back to the frontend over SSE — closing the
+%% recursion loop the talk is about.
+%%
+%% Read top-down. Solid arrows are request/response; dashed arrows are
+%% streaming or out-of-band signals.
+
+flowchart TB
+    User([User])
+
+    %% ─── Frontend ───────────────────────────────────────────────────────────
+    subgraph FE ["Frontend &nbsp;·&nbsp; React + Vite + TS &nbsp;·&nbsp; :4329"]
+        direction TB
+
+        Input["ChatInput<br/><span style='font-size:11px'>parseInput()</span>"]
+
+        subgraph FEHooks ["hooks"]
+            direction LR
+            UChat["useChat"]
+            UCode["useClaudeCode"]
+            USelf["useSelfEvolve"]
+            UCfg["useConfig<br/><span style='font-size:11px'>(EventSource)</span>"]
+        end
+
+        Theme["ThemeProvider<br/><span style='font-size:11px'>:root CSS vars</span>"]
+
+        subgraph FEViews ["display"]
+            direction LR
+            VChat["ResponseCard"]
+            VCode["ClaudeCodeStream"]
+            VSelf["SelfEvolveStream"]
+        end
+
+        Input -->|chat| UChat
+        Input -->|/code| UCode
+        Input -->|/self| USelf
+
+        UChat --> VChat
+        UCode --> VCode
+        USelf --> VSelf
+
+        UCfg --> Theme
+        Theme -.->|css vars| VChat
+        Theme -.->|css vars| VCode
+        Theme -.->|css vars| VSelf
+    end
+
+    %% ─── Backend ────────────────────────────────────────────────────────────
+    subgraph BE ["Backend &nbsp;·&nbsp; FastAPI + uvicorn &nbsp;·&nbsp; :8729"]
+        direction TB
+
+        subgraph Routes ["routes/"]
+            direction TB
+            RChat["POST /api/chat"]
+            RCC["POST /api/claude-code/execute"]
+            RSE["POST /api/self-evolve/execute"]
+            RCfg["GET /api/config"]
+            RCfgStream["GET /api/config/stream<br/><span style='font-size:11px'>(SSE)</span>"]
+        end
+
+        LlmClient["LlmClient<br/><span style='font-size:11px'>app/llm.py</span>"]
+        CCClient["ClaudeCodeClient<br/><span style='font-size:11px'>asyncio subprocess</span>"]
+
+        subgraph SelfPkg ["app/self_evolve/ &nbsp;·&nbsp; standalone package"]
+            direction TB
+            SeService["SelfEvolveService<br/><span style='font-size:11px'>orchestrator → ndjson</span>"]
+            SeLlm["SelfEvolveLlm<br/><span style='font-size:11px'>structured JSON proposals</span>"]
+            SePatch["ConfigPatcher<br/><span style='font-size:11px'>tomlkit · preserves comments</span>"]
+
+            SeService --> SeLlm
+            SeService --> SePatch
+        end
+
+        Bus["ConfigBus<br/><span style='font-size:11px'>broadcast queues</span>"]
+        Watch["watch_config<br/><span style='font-size:11px'>watchfiles.awatch</span>"]
+
+        Watch -->|publish UiConfig| Bus
+        Bus -->|subscribe| RCfgStream
+
+        RChat --> LlmClient
+        RCC --> CCClient
+        RSE --> SeService
+    end
+
+    %% ─── External & filesystem ──────────────────────────────────────────────
+    Config[("config.toml<br/>filesystem")]
+    OpenAI((("OpenAI API")))
+    ClaudeCLI((("claude CLI<br/>(local binary)")))
+
+    %% ─── Flows ──────────────────────────────────────────────────────────────
+    User --> Input
+
+    UChat -.->|"POST"| RChat
+    UCode -.->|"POST (ndjson stream)"| RCC
+    USelf -.->|"POST (ndjson stream)"| RSE
+    UCfg <-.->|"SSE: data: UiConfig"| RCfgStream
+
+    LlmClient -.->|HTTPS| OpenAI
+    SeLlm    -.->|HTTPS| OpenAI
+
+    CCClient -.->|"spawn (cwd=CLAUDE_CODE_TARGET_DIR)"| ClaudeCLI
+
+    SePatch -->|read + write| Config
+    Watch   -.->|fs events| Config
+
+    %% The recursion loop — highlighted
+    SePatch  ==>|"1. /self edits"| Config
+    Config   ==>|"2. fs change"| Watch
+    Bus      ==>|"3. publish"| RCfgStream
+    RCfgStream ==>|"4. SSE event"| UCfg
+    UCfg     ==>|"5. theme update"| Theme
+
+    %% ─── Styles ─────────────────────────────────────────────────────────────
+    classDef external fill:#1a1a26,stroke:#06b6d4,stroke-width:2px,color:#f5f5fa;
+    classDef fs       fill:#1a1a26,stroke:#fbbf24,stroke-width:2px,color:#f5f5fa;
+    classDef pkg      fill:#1a1a26,stroke:#8b5cf6,stroke-width:2px,color:#f5f5fa;
+
+    class OpenAI,ClaudeCLI external;
+    class Config fs;
+
+    linkStyle 0 stroke:#9ca3af
+    %% The five thick (==>) edges are the recursion loop — Mermaid styles them
+    %% bolder than regular --> edges automatically.
