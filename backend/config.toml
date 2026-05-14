@@ -25,6 +25,16 @@ well-structured Markdown. Use fenced code blocks for code, headings sparingly, \
 and prefer short, scannable paragraphs.\
 """
 
+# ─── Claude Code CLI bridge ───────────────────────────────────────────────────
+# Path to the target repo lives in .env as CLAUDE_CODE_TARGET_DIR.
+[claude_code]
+allowed_tools = ["Read", "Write", "Edit", "Bash", "Glob", "Grep"]
+max_turns = 10
+timeout_seconds = 300
+idle_timeout_seconds = 120
+skip_permissions = false
+system_prompt = ""
+
 # ─── UI (returned verbatim to the frontend at /api/config) ────────────────────
 [ui]
 title = "Recursive AI-Driven Software Development"

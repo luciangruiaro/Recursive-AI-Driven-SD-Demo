@@ -132,26 +132,57 @@ export function ChatInput({ placeholder, loading, onSubmit }: ChatInputProps) {
       </div>
 
       <div
-        className="mt-2 flex justify-end gap-3 px-1 text-[11px] tracking-wide opacity-50"
+        className="mt-2 flex items-center justify-between gap-3 px-1 text-[11px] tracking-wide"
         style={{ color: "var(--color-text-muted)" }}
       >
-        <span>
-          <kbd className="rounded border px-1 py-0.5 text-[10px]" style={{ borderColor: "var(--color-border)" }}>
-            ↵
-          </kbd>{" "}
-          send
-        </span>
-        <span>
-          <kbd className="rounded border px-1 py-0.5 text-[10px]" style={{ borderColor: "var(--color-border)" }}>
-            ⇧
-          </kbd>
-          +
-          <kbd className="rounded border px-1 py-0.5 text-[10px]" style={{ borderColor: "var(--color-border)" }}>
-            ↵
-          </kbd>{" "}
-          newline
-        </span>
+        <CommandHint value={value} />
+
+        <div className="flex gap-3 opacity-50">
+          <span>
+            <kbd className="rounded border px-1 py-0.5 text-[10px]" style={{ borderColor: "var(--color-border)" }}>
+              ↵
+            </kbd>{" "}
+            send
+          </span>
+          <span>
+            <kbd className="rounded border px-1 py-0.5 text-[10px]" style={{ borderColor: "var(--color-border)" }}>
+              ⇧
+            </kbd>
+            +
+            <kbd className="rounded border px-1 py-0.5 text-[10px]" style={{ borderColor: "var(--color-border)" }}>
+              ↵
+            </kbd>{" "}
+            newline
+          </span>
+        </div>
       </div>
     </motion.form>
+  );
+}
+
+function CommandHint({ value }: { value: string }) {
+  const trimmed = value.trim();
+  const isCode = trimmed === "/code" || trimmed.startsWith("/code ");
+  if (!isCode) return <span />;
+
+  return (
+    <motion.span
+      initial={{ opacity: 0, x: -4 }}
+      animate={{ opacity: 1, x: 0 }}
+      className="flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium"
+      style={{
+        borderColor:
+          "color-mix(in oklab, var(--color-primary) 50%, var(--color-border))",
+        background:
+          "color-mix(in oklab, var(--color-primary) 12%, transparent)",
+        color: "var(--color-primary)",
+      }}
+    >
+      <span
+        className="inline-block h-1 w-1 rounded-full"
+        style={{ background: "var(--color-primary)" }}
+      />
+      Claude Code
+    </motion.span>
   );
 }

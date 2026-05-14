@@ -2,14 +2,32 @@ import { motion } from "framer-motion";
 
 import { Background } from "@/components/Background";
 import { ChatInput } from "@/components/ChatInput";
+import { ClaudeCodeStream } from "@/components/ClaudeCodeStream";
 import { ResponseCard } from "@/components/ResponseCard";
 import { useChat } from "@/hooks/useChat";
+import { useClaudeCode } from "@/hooks/useClaudeCode";
 import { useConfig } from "@/hooks/useConfig";
 import { ThemeProvider } from "@/theme/ThemeProvider";
+
+const CODE_PREFIX = "/code";
+
+interface ParsedInput {
+  mode: "chat" | "code";
+  payload: string;
+}
+
+export function parseInput(raw: string): ParsedInput {
+  const trimmed = raw.trim();
+  if (trimmed === CODE_PREFIX || trimmed.startsWith(`${CODE_PREFIX} `)) {
+    return { mode: "code", payload: trimmed.slice(CODE_PREFIX.length).trim() };
+  }
+  return { mode: "chat", payload: trimmed };
+}
 
 export default function App() {
   const { config, error: configError, loading: configLoading } = useConfig();
   const chat = useChat();
+  const cc = useClaudeCode();
 
   if (configLoading) {
     return (
@@ -57,10 +75,24 @@ export default function App() {
     );
   }
 
-  const showResponseArea =
+  const handleSubmit = (raw: string) => {
+    const { mode, payload } = parseInput(raw);
+    if (mode === "code") {
+      if (!payload) return; // bare "/code" — nothing to do
+      chat.reset();
+      void cc.send(payload);
+      return;
+    }
+    cc.reset();
+    void chat.send(payload);
+  };
+
+  const codeActive = cc.status !== "idle";
+  const chatActive =
     chat.status === "loading" ||
     chat.status === "success" ||
     chat.status === "error";
+  const isLoading = chat.status === "loading" || cc.status === "running";
 
   return (
     <ThemeProvider theme={config.theme}>
@@ -97,12 +129,23 @@ export default function App() {
         <div className="w-full">
           <ChatInput
             placeholder={config.placeholder}
-            loading={chat.status === "loading"}
-            onSubmit={chat.send}
+            loading={isLoading}
+            onSubmit={handleSubmit}
           />
         </div>
 
-        {showResponseArea && (
+        {codeActive && (
+          <div className="w-full">
+            <ClaudeCodeStream
+              events={cc.events}
+              status={cc.status}
+              error={cc.error}
+              prompt={cc.prompt}
+            />
+          </div>
+        )}
+
+        {!codeActive && chatActive && (
           <div className="w-full">
             <ResponseCard
               status={chat.status}

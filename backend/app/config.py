@@ -46,6 +46,19 @@ class LlmConfig(BaseModel):
     system_prompt: str = "You are a helpful assistant."
 
 
+class ClaudeCodeConfig(BaseModel):
+    """Non-secret defaults for the local ``claude`` CLI invocation."""
+
+    allowed_tools: list[str] = Field(
+        default_factory=lambda: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
+    )
+    max_turns: int = 10
+    timeout_seconds: int = 300
+    idle_timeout_seconds: int = 120
+    skip_permissions: bool = False
+    system_prompt: str = ""
+
+
 class ThemeColors(BaseModel):
     background: str
     surface: str
@@ -78,7 +91,11 @@ class UiConfig(BaseModel):
 
 
 class Secrets(BaseSettings):
-    """Secret values, sourced from ``.env`` / environment variables."""
+    """Environment-specific values, sourced from ``.env`` / env variables.
+
+    Includes both true secrets (``openai_api_key``) and machine-specific paths
+    (``claude_code_target_dir``) that should not live in ``config.toml``.
+    """
 
     model_config = SettingsConfigDict(
         env_file=ENV_PATH,
@@ -88,6 +105,7 @@ class Secrets(BaseSettings):
     )
 
     openai_api_key: SecretStr = SecretStr("")
+    claude_code_target_dir: str = ""
 
 
 # ─── Aggregate ────────────────────────────────────────────────────────────────
@@ -97,6 +115,7 @@ class Settings(BaseModel):
     server: ServerConfig
     cors: CorsConfig
     llm: LlmConfig
+    claude_code: ClaudeCodeConfig
     ui: UiConfig
     secrets: Secrets
 
@@ -115,6 +134,7 @@ def get_settings() -> Settings:
         server=ServerConfig(**raw.get("server", {})),
         cors=CorsConfig(**raw.get("cors", {})),
         llm=LlmConfig(**raw.get("llm", {})),
+        claude_code=ClaudeCodeConfig(**raw.get("claude_code", {})),
         ui=UiConfig(**raw.get("ui", {})),
         secrets=Secrets(),
     )

@@ -11,10 +11,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
+from app.claude_code import ClaudeCodeClient
 from app.config import get_settings
 from app.llm import create_llm_client
 from app.logger import AccessLogMiddleware, log, setup_logging
-from app.routes import chat, hello, ui_config
+from app.routes import chat, claude_code, hello, ui_config
 
 
 def create_app() -> FastAPI:
@@ -45,9 +46,16 @@ def create_app() -> FastAPI:
         config=settings.llm,
     )
 
+    # Local Claude Code CLI bridge. Lazy — detects the binary on first call.
+    app.state.claude_code_client = ClaudeCodeClient(
+        target_dir=settings.secrets.claude_code_target_dir,
+        config=settings.claude_code,
+    )
+
     app.include_router(hello.router)
     app.include_router(chat.router)
     app.include_router(ui_config.router)
+    app.include_router(claude_code.router)
 
     log.info(
         "[bold green]ready[/bold green]  [dim]routes=%d  model=[/dim][magenta]%s[/magenta]",
