@@ -5,6 +5,7 @@ import type {
   ChatResponse,
   ClaudeCodeEvent,
   ClaudeCodeOptions,
+  SelfEvolveEvent,
   UiConfig,
 } from "@/types";
 
@@ -34,39 +35,34 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-interface ClaudeCodeStreamHandlers {
-  onEvent: (event: ClaudeCodeEvent) => void;
-}
+// ─── Shared ndjson reader ────────────────────────────────────────────────────
+// Both Claude Code and self-evolve stream newline-delimited JSON. We parse
+// per line and dispatch a typed event to ``onEvent``.
 
-/** POST /api/claude-code/execute and stream ndjson events to ``onEvent``.
- *  Resolves when the stream is fully consumed; throws on non-2xx response.
- *  Pass an ``AbortSignal`` to cancel mid-stream. */
-async function executeClaudeCode(
-  prompt: string,
-  options: ClaudeCodeOptions,
-  handlers: ClaudeCodeStreamHandlers,
+async function streamNdjson<E>(
+  path: string,
+  body: Record<string, unknown>,
+  onEvent: (event: E) => void,
   signal?: AbortSignal,
 ): Promise<void> {
-  const response = await fetch(`${BASE_URL}/api/claude-code/execute`, {
+  const response = await fetch(`${BASE_URL}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt, ...options }),
+    body: JSON.stringify(body),
     signal,
   });
 
   if (!response.ok) {
     let detail = response.statusText;
     try {
-      const body = await response.json();
-      detail = body.detail ?? detail;
+      const errorBody = await response.json();
+      detail = errorBody.detail ?? detail;
     } catch {
       /* not JSON */
     }
     throw new Error(`Request failed (${response.status}): ${detail}`);
   }
-  if (!response.body) {
-    throw new Error("Claude Code response had no body");
-  }
+  if (!response.body) throw new Error("Streaming response had no body");
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -76,7 +72,7 @@ async function executeClaudeCode(
     const trimmed = line.trim();
     if (!trimmed) return;
     try {
-      handlers.onEvent(JSON.parse(trimmed) as ClaudeCodeEvent);
+      onEvent(JSON.parse(trimmed) as E);
     } catch {
       // skip malformed lines silently
     }
@@ -101,6 +97,45 @@ async function executeClaudeCode(
   }
 }
 
+// ─── Public endpoints ────────────────────────────────────────────────────────
+
+interface ClaudeCodeStreamHandlers {
+  onEvent: (event: ClaudeCodeEvent) => void;
+}
+
+interface SelfEvolveStreamHandlers {
+  onEvent: (event: SelfEvolveEvent) => void;
+}
+
+/** POST /api/claude-code/execute and stream ndjson events to ``onEvent``. */
+async function executeClaudeCode(
+  prompt: string,
+  options: ClaudeCodeOptions,
+  handlers: ClaudeCodeStreamHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  await streamNdjson<ClaudeCodeEvent>(
+    "/api/claude-code/execute",
+    { prompt, ...options },
+    handlers.onEvent,
+    signal,
+  );
+}
+
+/** POST /api/self-evolve/execute and stream ndjson events to ``onEvent``. */
+async function executeSelfEvolve(
+  prompt: string,
+  handlers: SelfEvolveStreamHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  await streamNdjson<SelfEvolveEvent>(
+    "/api/self-evolve/execute",
+    { prompt },
+    handlers.onEvent,
+    signal,
+  );
+}
+
 export const api = {
   hello: () => http<{ message: string }>("/api/hello"),
   getConfig: () => http<UiConfig>("/api/config"),
@@ -110,4 +145,5 @@ export const api = {
       body: JSON.stringify({ message }),
     }),
   executeClaudeCode,
+  executeSelfEvolve,
 };

@@ -83,3 +83,41 @@ export interface ClaudeCodeOptions {
   system_prompt?: string;
   session_id?: string;
 }
+
+// ─── Self-evolve event stream ────────────────────────────────────────────────
+// Shapes mirror the events emitted by ``app.self_evolve.service``.
+
+export interface SelfEvolveChange {
+  path: string;
+  value: unknown;
+}
+
+export interface SelfEvolveAppliedChange {
+  path: string;
+  old_value: unknown;
+  new_value: unknown;
+}
+
+export type SelfEvolveEvent =
+  | {
+      type: "step";
+      name: "read_config" | "call_llm" | "apply";
+      ok: boolean;
+      [k: string]: unknown;
+    }
+  | {
+      type: "proposal";
+      summary: string;
+      changes: SelfEvolveChange[];
+    }
+  | {
+      type: "applied";
+      changes: SelfEvolveAppliedChange[];
+    }
+  | {
+      type: "done";
+      applied: SelfEvolveAppliedChange[];
+      duration_ms: number;
+      note?: string;
+    }
+  | { type: "error"; error: string };

@@ -51,4 +51,34 @@ describe("parseInput", () => {
       payload: "please do:\n- step one\n- step two",
     });
   });
+
+  it("routes /self <payload> to self-evolve mode and strips the prefix", () => {
+    expect(parseInput("/self make the background red")).toEqual({
+      mode: "self",
+      payload: "make the background red",
+    });
+  });
+
+  it("treats bare /self as self mode with empty payload", () => {
+    expect(parseInput("/self")).toEqual({ mode: "self", payload: "" });
+    expect(parseInput("  /self  ")).toEqual({ mode: "self", payload: "" });
+  });
+
+  it("handles leading whitespace before /self", () => {
+    expect(parseInput("   /self bump max_tokens to 2048")).toEqual({
+      mode: "self",
+      payload: "bump max_tokens to 2048",
+    });
+  });
+
+  it("does NOT match /selfish or /selfevolve — only /self followed by space or end", () => {
+    expect(parseInput("/selfish prompt")).toEqual({
+      mode: "chat",
+      payload: "/selfish prompt",
+    });
+    expect(parseInput("/selfevolve")).toEqual({
+      mode: "chat",
+      payload: "/selfevolve",
+    });
+  });
 });

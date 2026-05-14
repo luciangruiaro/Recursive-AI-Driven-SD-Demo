@@ -162,27 +162,31 @@ export function ChatInput({ placeholder, loading, onSubmit }: ChatInputProps) {
 
 function CommandHint({ value }: { value: string }) {
   const trimmed = value.trim();
+
   const isCode = trimmed === "/code" || trimmed.startsWith("/code ");
-  if (!isCode) return <span />;
+  const isSelf = trimmed === "/self" || trimmed.startsWith("/self ");
+  if (!isCode && !isSelf) return <span />;
+
+  const label = isCode ? "Coding agent" : "Self-evolving";
+  const accent = isCode ? "var(--color-primary)" : "var(--color-accent)";
 
   return (
     <motion.span
+      key={label}
       initial={{ opacity: 0, x: -4 }}
       animate={{ opacity: 1, x: 0 }}
       className="flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium"
       style={{
-        borderColor:
-          "color-mix(in oklab, var(--color-primary) 50%, var(--color-border))",
-        background:
-          "color-mix(in oklab, var(--color-primary) 12%, transparent)",
-        color: "var(--color-primary)",
+        borderColor: `color-mix(in oklab, ${accent} 50%, var(--color-border))`,
+        background: `color-mix(in oklab, ${accent} 12%, transparent)`,
+        color: accent,
       }}
     >
       <span
         className="inline-block h-1 w-1 rounded-full"
-        style={{ background: "var(--color-primary)" }}
+        style={{ background: accent }}
       />
-      Claude Code
+      {label}
     </motion.span>
   );
 }

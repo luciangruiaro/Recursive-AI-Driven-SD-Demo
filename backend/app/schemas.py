@@ -47,3 +47,16 @@ class ClaudeCodeExecuteRequest(BaseModel):
     skip_permissions: bool | None = None
     system_prompt: str | None = None
     session_id: str = ""
+
+
+# ─── Self-evolve ──────────────────────────────────────────────────────────────
+
+
+class SelfEvolveHealthResponse(BaseModel):
+    available: bool
+    reason: str | None = None
+    config_path: str | None = None
+
+
+class SelfEvolveRequest(BaseModel):
+    prompt: str = Field(..., min_length=1, max_length=8000)

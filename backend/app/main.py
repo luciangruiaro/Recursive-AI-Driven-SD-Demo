@@ -20,7 +20,8 @@ from app.config import get_settings
 from app.config_watcher import ConfigBus, watch_config
 from app.llm import create_llm_client
 from app.logger import AccessLogMiddleware, log, setup_logging
-from app.routes import chat, claude_code, hello, ui_config
+from app.routes import chat, claude_code, hello, self_evolve, ui_config
+from app.self_evolve import SelfEvolveLlm, SelfEvolveService
 
 
 @asynccontextmanager
@@ -75,10 +76,21 @@ def create_app() -> FastAPI:
         config=settings.claude_code,
     )
 
+    # Self-evolve module — same OpenAI key, dedicated low-temperature client
+    # tuned for structured JSON patches against the target config.toml.
+    app.state.self_evolve_service = SelfEvolveService(
+        target_dir=settings.secrets.self_evolve_target_dir,
+        llm=SelfEvolveLlm(
+            api_key=settings.secrets.openai_api_key.get_secret_value(),
+            model=settings.llm.model,
+        ),
+    )
+
     app.include_router(hello.router)
     app.include_router(chat.router)
     app.include_router(ui_config.router)
     app.include_router(claude_code.router)
+    app.include_router(self_evolve.router)
 
     log.info(
         "[bold green]ready[/bold green]  [dim]routes=%d  model=[/dim][magenta]%s[/magenta]",

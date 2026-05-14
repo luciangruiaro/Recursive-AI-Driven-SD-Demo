@@ -106,6 +106,7 @@ class Secrets(BaseSettings):
 
     openai_api_key: SecretStr = SecretStr("")
     claude_code_target_dir: str = ""
+    self_evolve_target_dir: str = ""
 
 
 # ─── Aggregate ────────────────────────────────────────────────────────────────

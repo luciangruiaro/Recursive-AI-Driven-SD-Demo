@@ -4,15 +4,18 @@ import { Background } from "@/components/Background";
 import { ChatInput } from "@/components/ChatInput";
 import { ClaudeCodeStream } from "@/components/ClaudeCodeStream";
 import { ResponseCard } from "@/components/ResponseCard";
+import { SelfEvolveStream } from "@/components/SelfEvolveStream";
 import { useChat } from "@/hooks/useChat";
 import { useClaudeCode } from "@/hooks/useClaudeCode";
 import { useConfig } from "@/hooks/useConfig";
+import { useSelfEvolve } from "@/hooks/useSelfEvolve";
 import { ThemeProvider } from "@/theme/ThemeProvider";
 
 const CODE_PREFIX = "/code";
+const SELF_PREFIX = "/self";
 
 interface ParsedInput {
-  mode: "chat" | "code";
+  mode: "chat" | "code" | "self";
   payload: string;
 }
 
@@ -21,6 +24,9 @@ export function parseInput(raw: string): ParsedInput {
   if (trimmed === CODE_PREFIX || trimmed.startsWith(`${CODE_PREFIX} `)) {
     return { mode: "code", payload: trimmed.slice(CODE_PREFIX.length).trim() };
   }
+  if (trimmed === SELF_PREFIX || trimmed.startsWith(`${SELF_PREFIX} `)) {
+    return { mode: "self", payload: trimmed.slice(SELF_PREFIX.length).trim() };
+  }
   return { mode: "chat", payload: trimmed };
 }
 
@@ -28,6 +34,7 @@ export default function App() {
   const { config, error: configError, loading: configLoading } = useConfig();
   const chat = useChat();
   const cc = useClaudeCode();
+  const se = useSelfEvolve();
 
   if (configLoading) {
     return (
@@ -78,21 +85,34 @@ export default function App() {
   const handleSubmit = (raw: string) => {
     const { mode, payload } = parseInput(raw);
     if (mode === "code") {
-      if (!payload) return; // bare "/code" — nothing to do
+      if (!payload) return;
       chat.reset();
+      se.reset();
       void cc.send(payload);
       return;
     }
+    if (mode === "self") {
+      if (!payload) return;
+      chat.reset();
+      cc.reset();
+      void se.send(payload);
+      return;
+    }
     cc.reset();
+    se.reset();
     void chat.send(payload);
   };
 
   const codeActive = cc.status !== "idle";
+  const selfActive = se.status !== "idle";
   const chatActive =
     chat.status === "loading" ||
     chat.status === "success" ||
     chat.status === "error";
-  const isLoading = chat.status === "loading" || cc.status === "running";
+  const isLoading =
+    chat.status === "loading" ||
+    cc.status === "running" ||
+    se.status === "running";
 
   return (
     <ThemeProvider theme={config.theme}>
@@ -134,7 +154,18 @@ export default function App() {
           />
         </div>
 
-        {codeActive && (
+        {selfActive && (
+          <div className="w-full">
+            <SelfEvolveStream
+              events={se.events}
+              status={se.status}
+              error={se.error}
+              prompt={se.prompt}
+            />
+          </div>
+        )}
+
+        {!selfActive && codeActive && (
           <div className="w-full">
             <ClaudeCodeStream
               events={cc.events}
@@ -145,7 +176,7 @@ export default function App() {
           </div>
         )}
 
-        {!codeActive && chatActive && (
+        {!selfActive && !codeActive && chatActive && (
           <div className="w-full">
             <ResponseCard
               status={chat.status}
