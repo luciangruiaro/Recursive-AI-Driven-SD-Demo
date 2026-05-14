@@ -1,11 +1,15 @@
 """FastAPI application factory.
 
-Wires configuration, CORS, logging, the shared LLM client, and route modules
-together. Kept deliberately thin — composition lives here, behaviour lives in
-``app.routes`` and ``app.llm``.
+Wires configuration, CORS, logging, the shared LLM client, the Claude Code
+bridge, and the config-watcher lifespan together. Kept deliberately thin —
+composition lives here, behaviour lives in the supporting modules.
 """
 
 from __future__ import annotations
+
+import asyncio
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,9 +17,27 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import __version__
 from app.claude_code import ClaudeCodeClient
 from app.config import get_settings
+from app.config_watcher import ConfigBus, watch_config
 from app.llm import create_llm_client
 from app.logger import AccessLogMiddleware, log, setup_logging
 from app.routes import chat, claude_code, hello, ui_config
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Start the config.toml file watcher; cancel cleanly on shutdown."""
+    bus = ConfigBus()
+    app.state.config_bus = bus
+
+    watcher = asyncio.create_task(watch_config(bus), name="config-watcher")
+    try:
+        yield
+    finally:
+        watcher.cancel()
+        try:
+            await watcher
+        except asyncio.CancelledError:
+            pass
 
 
 def create_app() -> FastAPI:
@@ -27,6 +49,7 @@ def create_app() -> FastAPI:
         version=__version__,
         docs_url="/docs",
         redoc_url=None,
+        lifespan=lifespan,
     )
 
     # Access log first (added last so it wraps everything else: CORS, routing,

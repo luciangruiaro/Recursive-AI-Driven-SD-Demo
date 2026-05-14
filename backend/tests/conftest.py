@@ -4,11 +4,16 @@ The :class:`FakeLlmClient` lets us exercise ``/api/chat`` without touching the
 network. We swap it onto ``app.state.llm_client`` after :func:`create_app`,
 exactly the same slot the real :class:`~app.llm.OpenAiClient` occupies in prod —
 so the routes don't know they're talking to a fake.
+
+We also replace the production lifespan with a quiet one that sets up the
+:class:`ConfigBus` but skips the ``watchfiles`` watcher task — that task can
+hang Windows test teardowns and isn't what we're testing.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 
 import pytest
@@ -16,6 +21,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
+from app.config_watcher import ConfigBus
 from app.main import create_app
 
 
@@ -32,6 +38,13 @@ class FakeLlmClient:
         if self.error is not None:
             raise self.error
         return self.response
+
+
+@asynccontextmanager
+async def _quiet_lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Lifespan for tests: install the bus, skip the file watcher."""
+    app.state.config_bus = ConfigBus()
+    yield
 
 
 @pytest.fixture(autouse=True)
@@ -51,6 +64,7 @@ def fake_llm() -> FakeLlmClient:
 def app(fake_llm: FakeLlmClient) -> FastAPI:
     application = create_app()
     application.state.llm_client = fake_llm
+    application.router.lifespan_context = _quiet_lifespan
     return application
 
 
