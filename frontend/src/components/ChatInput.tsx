@@ -64,6 +64,7 @@ export function ChatInput({ placeholder, loading, onSubmit }: ChatInputProps) {
       {/* Soft focus glow */}
       <motion.div
         aria-hidden
+        initial={{ opacity: 0 }}
         animate={{ opacity: focused ? 0.5 : 0 }}
         transition={{ duration: 0.3 }}
         className="pointer-events-none absolute -inset-px rounded-2xl blur-md"
